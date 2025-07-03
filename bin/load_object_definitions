@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+import argparse
+import instil_salesforce as sf
+import log_factory
+import logging
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="Load Salesforce object definitions from salesforce and save to YAML files."
+    )
+    parser.add_argument("-o", "--object", action="append", help="Salesforce object API name (can be used multiple times)")
+    parser.add_argument("-f", "--file", required=True, help="Output directory for YAML files")
+    parser.add_argument("-a", "--all", action="store_true", help="Include all objects")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Enable verbose logging")
+
+    args = parser.parse_args()
+
+    log_factory.create()
+    if args.verbose:
+        log_factory.set_log_level(logging.DEBUG)
+
+    logging.info(f"dumping fields for {len(args.object)} salesforce objects...")
+    sf.load_object_definitions(names=args.object, output=args.file)
+
+
+if __name__ == "__main__":
+    main()
