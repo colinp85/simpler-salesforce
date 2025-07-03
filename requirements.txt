@@ -1,3 +1,4 @@
 PyYAML==6.0.2
 requests==2.32.4
 simple-salesforce==1.12.6
+log-factory
