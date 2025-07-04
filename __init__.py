@@ -9,14 +9,6 @@ import glob
 # Set SSL library log level to ERROR to reduce verbose output
 logging.getLogger('urllib3').setLevel(logging.ERROR)
 
-URL = os.environ.get('SALESFORCE_TOKEN_URL')
-
-data = {
-    'grant_type': "client_credentials",
-    'client_id': os.environ.get('CONSUMER_KEY'),
-    'client_secret': os.environ.get('CONSUMER_SECRET')
-}
-
 sf = None
 
 object_definitions = {}
@@ -31,8 +23,16 @@ def get_client():
     """
     global sf
 
+    url = os.environ.get('SALESFORCE_TOKEN_URL')
+
+    auth_data = {
+        'grant_type': "client_credentials",
+        'client_id': os.environ.get('CONSUMER_KEY'),
+        'client_secret': os.environ.get('CONSUMER_SECRET')
+    }
+
     if sf is None:
-        resp = requests.post(URL, data=data).json()
+        resp = requests.post(url, data=auth_data).json()
 
         # Connect to Salesforce
         try:
