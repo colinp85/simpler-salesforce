@@ -235,7 +235,13 @@ def update_object(object_name, object_id, data):
     """
     try:
         svc = get_client()
-        result = svc.__getattr__(object_name).update(object_id, data)
+        
+        # Remove Id field from data if present (Salesforce doesn't allow updating the Id field)
+        update_data = data.copy()
+        if 'Id' in update_data:
+            del update_data['Id']
+            
+        result = svc.__getattr__(object_name).update(object_id, update_data)
         logging.info(f"Updated {object_name} with Id: {object_id}")
         return result
     except Exception as e:
