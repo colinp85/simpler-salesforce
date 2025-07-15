@@ -223,6 +223,26 @@ def create_object(object_name, data):
         return None
 
 
+def update_object(object_name, object_id, data):
+    """
+    Updates an existing Salesforce object record using the provided data.
+    Args:
+        object_name (str): The API name of the Salesforce object.
+        object_id (str): The Id of the object record to update.
+        data (dict): The data to update the object with.
+    Returns:
+        dict: The update result (usually contains updated count).
+    """
+    try:
+        svc = get_client()
+        result = svc.__getattr__(object_name).update(object_id, data)
+        logging.info(f"Updated {object_name} with Id: {object_id}")
+        return result
+    except Exception as e:
+        logging.error(f"Error updating {object_name} with Id {object_id}: {e}")
+        return None
+
+
 def get_object(object_name, where=None):
     """
     Query Salesforce for objects by API name, using fields from the loaded YAML definitions.
