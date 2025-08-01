@@ -1,9 +1,11 @@
+import concurrent.futures
 from simple_salesforce import Salesforce
 import os
 import logging
 import yaml
 import requests
 import glob
+import threading
 
     
 # Set SSL library log level to ERROR to reduce verbose output
@@ -12,6 +14,12 @@ logging.getLogger('urllib3').setLevel(logging.ERROR)
 sf = None
 
 object_definitions = {}
+
+
+def split_into_batches(items, batch_size):
+    full_list = list(items)
+    for i in range(0, len(full_list), batch_size):
+        yield full_list[i:i + batch_size]
 
 
 def get_client():
@@ -389,3 +397,87 @@ def upload_file(object_id, file_path):
     except Exception as e:
         logging.error(f"Failed to upload file '{file_path}' to object ID '{object_id}': {e}")
         raise
+
+
+def retrieve_associated_files(object_id, batch_size=1, output_directory='attachments/'):
+    logging.info(f'output directory: {output_directory}')
+    if not os.path.isdir(output_directory):
+        os.mkdir(output_directory)
+
+    # retrieve all the ContentDocumentLinks for content documents we're going to download
+    logging.info("Querying to get Content Document Ids...")
+
+    content_document_links = get_object('ContentDocumentLink', where=f"LinkedEntityId = '{object_id}'")
+    logging.info(f"Found {len(content_document_links)} total files")
+
+    # Begin Downloads
+    global_lock = threading.Lock()
+    files = fetch_files(content_document_links=content_document_links, output_directory=output_directory,
+                batch_size=batch_size, content_document_id_name='ContentDocumentId')
+    return files
+
+
+def fetch_files(content_document_links=None, output_directory=None,
+                content_document_id_name='ContentDocumentId', batch_size=100):
+
+    files = []
+    # Divide the full list of files into batches of 100 ids
+    batches = list(split_into_batches(content_document_links, batch_size))
+
+    i = 0
+    for batch in batches:
+        i = i + 1
+        logging.info(f"Processing batch {i}/{len(batches)}")
+
+        where = "IsLatest = True AND FileExtension != 'snote'"
+        where = where + ' AND ContentDocumentId in (' + ",".join("'" + item[content_document_id_name] + "'" for item in batch) + ')'
+        content_version = get_object('ContentVersion', where=where)
+
+        logging.debug(f"ContentVersion query found {len(content_version)} results")
+
+        while content_version:
+            processes = []
+            with concurrent.futures.ThreadPoolExecutor(max_workers=None) as executor:
+                args = ((record, output_directory) for record in content_version)
+                processes.append(executor.submit(download_file, *args))
+
+                for _ in concurrent.futures.as_completed(processes):
+                    files.append(_.result())
+            break
+
+        logging.debug('All files in batch {0} downloaded'.format(i))
+    logging.debug('All batches complete')
+    return files
+
+
+def download_file(args):
+    record, output_directory = args
+
+    title = record["Title"]
+    file_extension = record["FileExtension"]
+
+    url = f"https://{sf.sf_instance}{record['VersionData']}"
+
+    logging.debug(f"downloading from {url}")
+    response = requests.get(url, headers={"Authorization": "OAuth " + sf.session_id,
+                                          "Content-Type": "application/octet-stream"})
+    if response.ok:
+        # Save File
+        filename = create_filename(title, file_extension, output_directory)
+
+        with open(filename, "wb") as output_file:
+            output_file.write(response.content)
+
+        logging.info(f"saved file to {filename}")
+        return filename
+    else:
+        logging.warning(f"couldn't download {url}")
+
+
+def create_filename(title, file_extension, output_directory):
+    bad_chars = [';', ':', '!', "*", '/', '\\']
+    clean_title = filter(lambda i: i not in bad_chars, title)
+    clean_title = ''.join(list(clean_title))
+
+    filename = os.path.join(output_directory, f"{clean_title}.{file_extension}")
+    return filename
