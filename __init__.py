@@ -48,7 +48,7 @@ def get_client():
             logging.info("Connected to Salesforce successfully!")
             return sf
         except Exception as e:
-            logging.error(f"Error connecting to Salesforce: {e}")
+            logging.error(f"Error connecting to Salesforce [{resp['error']}]:{resp['error_description']}")
             exit(1)
 
     return sf
@@ -254,6 +254,22 @@ def update_object(object_name, object_id, data):
         return result
     except Exception as e:
         logging.error(f"Error updating {object_name} with Id {object_id}: {e}")
+        return None
+
+
+def delete_object(object_name, object_id):
+    """
+    Deletes a Salesforce object record by its API name and Id.
+    Args:
+        object_name (str): The API name of the Salesforce object.
+        object_id (str): The Id of the object record to delete."""
+    try:
+        svc = get_client()
+        result = svc.__getattr__(object_name).delete(object_id)
+        logging.info(f"Deleted {object_name} with Id: {object_id}")
+        return result
+    except Exception as e:
+        logging.error(f"Error deleting {object_name} with Id {object_id}: {e}")
         return None
 
 
