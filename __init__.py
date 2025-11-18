@@ -44,6 +44,11 @@ def get_client():
 
         # Connect to Salesforce
         try:
+            if 'instance_url' not in resp:
+                logging.error(f"Error connecting to Salesforce: instance_url not in response")
+                logging.error(f"{resp}")
+                exit(1)
+            logging.debug(f"response received: {resp}")
             sf = Salesforce(instance_url=resp['instance_url'], session_id=resp['access_token'])
             logging.info("Connected to Salesforce successfully!")
             return sf
